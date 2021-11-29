@@ -10,9 +10,19 @@ class HeatEquationSolver:
                  t_final=0.1,
                  a: int = 0,
                  b: int = 1,
+                 # M_func: callable,
                  t_a: float = 0,
                  t_b: float = 0,
                  n_x_points: int = 100):
+        """
+        t_final: final time in seconds
+        a: left most x-boundary
+        b: right most x-boundary
+        M: moving right most x-boundary as a function of t
+        t_a: temperature at a, t_a = 0
+        t_b: temperature at b, t_b = 0
+        n_x_points: number of points in x-direction
+        """
         self.T_a = t_a
         self.T_b = t_b
         self.mu = 1 / 4  # By design.
@@ -26,18 +36,17 @@ class HeatEquationSolver:
         self.x = np.linspace(a, b, self.n_x_points)
         self.t = np.arange(0, t_final, self.dt)
         self.u_0 = np.reshape(u_0_func(self.x), (100, 1))
+        # self.Mt = np.reshape(M_func(self.t), (len(self.t), 1))
         self.data = [self.u_0]
         self.result = None
 
     def create_main_matrix(self):
+        """
+        Matrix for theta method
+        """
         tri_diag = np.ones((3, self.n_x_points))
         tri_diag[1] = -2 * tri_diag[1]
-        # tri_diag[2, 1] = 0
-        # tri_diag[1, 0] = 1/self.mu
-        # tri_diag[0, -2] = 0
-        # tri_diag[1, -1] = 1/self.mu
         a_matrix = sparse.spdiags(tri_diag, [-1, 0, 1], self.n_x_points, self.n_x_points) * self.mu
-        # Setting the top and bottom entries to just reflect.
 
         i_matrix = sparse.identity(self.n_x_points)
         return a_matrix, i_matrix
@@ -49,13 +58,6 @@ class HeatEquationSolver:
             D2, I = self.create_main_matrix()
             lhs = (I - D2 / 2)
             rhs = (I + D2 / 2) * u
-            # rhs[1] += self.mu / 2 * self.T_a
-            # rhs[-2] += self.mu / 2 * self.T_b
-
-            # Setting the BCs:
-            u[0] = self.T_a
-            u[-1] = self.T_b
-
             u = np.transpose(np.mat(sparse.linalg.spsolve(lhs, rhs)))
 
             self.data.append(np.copy(u))
@@ -79,9 +81,13 @@ class HeatEquationSolver:
 
 
 def initial_value(x):
-    return 6 * np.sin(np.pi * x) + (20 + x * 10)
+    return -6 * np.sin(np.pi * x)
 
+def moving_boundary(t):
+    """ to be defined """
+    pass
 
-solver = HeatEquationSolver(u_0_func=initial_value, t_a=20, t_b=30)
+solver = HeatEquationSolver(u_0_func=initial_value, t_a=20, t_b=30) #, M_func=moving_boundary)
 res = solver.solve()
 solver.plot()
+
