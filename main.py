@@ -5,89 +5,91 @@ from math import ceil
 import numpy as np
 
 
-class HeatEquationSolver:
-    def __init__(self, u_0_func: callable,
-                 t_final=0.1,
-                 a: int = 0,
-                 b: int = 1,
-                 # M_func: callable,
-                 t_a: float = 0,
-                 t_b: float = 0,
-                 n_x_points: int = 100):
-        """
-        t_final: final time in seconds
-        a: left most x-boundary
-        b: right most x-boundary
-        M: moving right most x-boundary as a function of t
-        t_a: temperature at a, t_a = 0
-        t_b: temperature at b, t_b = 0
-        n_x_points: number of points in x-direction
-        """
-        self.T_a = t_a
-        self.T_b = t_b
-        self.mu = 1 / 4  # By design.
-        self.c = 1
-        self.dx = 1 / n_x_points
-        self.dt = self.dx ** 2 / (4 * self.c)
-
-        self.n_x_points = n_x_points
-        self.n_t_points = ceil(t_final / self.dt)
-
-        self.x = np.linspace(a, b, self.n_x_points)
-        self.t = np.arange(0, t_final, self.dt)
-        self.u_0 = np.reshape(u_0_func(self.x), (100, 1))
-        # self.Mt = np.reshape(M_func(self.t), (len(self.t), 1))
-        self.data = [self.u_0]
-        self.result = None
-
-    def create_main_matrix(self):
+def solve_one_time_step(u_0, mu):
+    def create_main_matrix(n_x_points, mu):
         """
         Matrix for theta method
         """
-        tri_diag = np.ones((3, self.n_x_points))
+        tri_diag = np.ones((3, n_x_points))
         tri_diag[1] = -2 * tri_diag[1]
-        a_matrix = sparse.spdiags(tri_diag, [-1, 0, 1], self.n_x_points, self.n_x_points) * self.mu
+        a_matrix = sparse.spdiags(tri_diag, [-1, 0, 1], n_x_points, n_x_points) * mu
 
-        i_matrix = sparse.identity(self.n_x_points)
+        i_matrix = sparse.identity(n_x_points)
         return a_matrix, i_matrix
 
-    def solve(self):
-        u = self.u_0
+    u = u_0
 
-        for i in range(self.n_t_points):
-            D2, I = self.create_main_matrix()
-            lhs = (I - D2 / 2)
-            rhs = (I + D2 / 2) * u
-            u = np.transpose(np.mat(sparse.linalg.spsolve(lhs, rhs)))
+    D2, I = create_main_matrix(n_x_points=u_0.shape[0], mu=mu)
+    lhs = (I - D2 / 2)
+    rhs = (I + D2 / 2) * u
+    u = np.transpose(np.mat(sparse.linalg.spsolve(lhs, rhs)))
 
-            self.data.append(np.copy(u))
-            if (i % 1000) == 0:
-                print(".", end="")
+    return u
 
-        self.result = np.hstack(self.data)
 
-        return self.result
+def solve_heat_equation(u_0_func, t_final, x_a, x_b, temp_a, temp_b, n_x_points, c, plot=False):
+    """
+    This function approximates a solution to the generic heat equation
 
-    def plot(self):
-        X, Y = np.meshgrid(self.x, self.t)
+    u_0_func: function of x that returns the initial value.
+    t_final: Latest time to simulate to [s]
+    x_a: The lowest x-value of the domain [m]
+    x_b: The highest x-value of the domain [m]
+    temp_a: The temperature at x=a (Dirichlet BV) [deg C]
+    temp_b: The temperature at x=b (Dirichlet BV) [deg C]
+    n_x_points: The number of points required in the x-direction.
+    c: The constant in the heat equation.
+    """
+    mu = 1  # Arbitrarily chosen, pick a higher number to increase the time step.
+    # This mu was initially set to 1/4 as it needed to be less than 1/2 for an explicit scheme.
+    dx = 1 / n_x_points
+    dt = dx ** 2 * mu / c
+    n_t_points = ceil(t_final / dt)
+
+    x = np.linspace(x_a, x_b, n_x_points)
+    t = np.arange(0, t_final, dt)
+    u_0 = np.reshape(u_0_func(x), (100, 1))
+    data = [u_0]
+
+    u = u_0
+    for t_i in range(n_t_points):
+        u = solve_one_time_step(u_0=u, mu=mu)
+        data.append(u)
+
+        if (t_i % 1000) == 0:
+            print(".", end="")
+
+    result = np.hstack(data)
+
+    if plot:
+        X, Y = np.meshgrid(x, t)
         fig = plt.figure()
         ax = plt.axes(projection='3d')
 
         # Creating plot
-        ax.plot_surface(X, Y, self.result[:, :-1].T)
+        ax.plot_surface(X, Y, result[:, :-1].T)
         ax.set_xlabel("X [m]")
         ax.set_ylabel("T [s]")
         plt.show()
+
+    return result
 
 
 def initial_value(x):
     return -6 * np.sin(np.pi * x)
 
+
 def moving_boundary(t):
     """ to be defined """
     pass
 
-solver = HeatEquationSolver(u_0_func=initial_value, t_a=20, t_b=30) #, M_func=moving_boundary)
-res = solver.solve()
-solver.plot()
 
+solve_heat_equation(u_0_func=initial_value,
+                    t_final=0.1,
+                    x_a=0,
+                    x_b=1,
+                    temp_a=0,
+                    temp_b=0,
+                    n_x_points=100,
+                    c=1,
+                    plot=True)
