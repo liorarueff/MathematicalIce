@@ -1,8 +1,10 @@
 import matplotlib.pyplot as plt
+import scipy.optimize as optimize
 import scipy.sparse as sparse
 import scipy.sparse.linalg
 from math import ceil
 import numpy as np
+import sys
 
 
 def solve_one_time_step(u_0, mu):
@@ -42,7 +44,7 @@ def solve_heat_equation(u_0_func, t_final, x_a, x_b, temp_a, temp_b, n_x_points,
     """
     mu = 1  # Arbitrarily chosen, pick a higher number to increase the time step.
     # This mu was initially set to 1/4 as it needed to be less than 1/2 for an explicit scheme.
-    dx = 1 / n_x_points
+    dx = (x_b-x_a)/n_x_points
     dt = dx ** 2 * mu / c
     n_t_points = ceil(t_final / dt)
 
@@ -82,6 +84,67 @@ def initial_value(x):
 def moving_boundary(t):
     """ to be defined """
     pass
+
+def solve_model(u_0_func, t_final, x_a = 0, x_b, temp_a, temp_b, n_x_points, c, plot=False):
+    """
+    u_0_func: function of x that returns the initial value.
+    t_final: Latest time to simulate to [s]
+    x_a: The lowest x-value of the domain [m], x_a = 0
+    x_b: The highest x-value of the domain [m]
+    temp_a: The temperature at x=a (Dirichlet BV) [deg C]
+    temp_b: The temperature at x=b (Dirichlet BV) [deg C]
+    n_x_points: The number of points required in the x-direction.
+    c: The constant in the heat equation.
+    """
+    mu = 1  # Arbitrarily chosen, pick a higher number to increase the time step.
+    # This mu was initially set to 1/4 as it needed to be less than 1/2 for an explicit scheme.
+    dx = (x_b-x_a) / n_x_points
+    dt = dx ** 2 * mu / c
+    n_t_points = ceil(t_final / dt)
+
+    # Find the starting point of the moving boundaries h_1 and h_2
+    # k = 1
+    # xs = np.linspace(x_a, x_b, 1000*k)
+    # t_zero = u_0_func(xs)
+    # sgn = np.sign(t_zero)
+    # zbd = []
+    # for i in range(0,10000-1):
+        # if sgn[i] != sgn[i+1]:
+            # zbd.append((xs[i]+xs[i+1])/2)
+    # while len(zbd) != 2 and k < 11:
+        # k += 1
+        # xs = np.linspace(x_a, x_b, 1000 * k)
+        # t_zero = u_0_func(xs)
+        # sgn = np.sign(t_zero)
+        # zbd = []
+        # for i in range(0, 10000 - 2):
+            # if sgn[i] != sgn[i + 1]:
+                # zbd.append((xs[i] + xs[i + 1]) / 2)
+    # if len(zbd) != 2:
+        # sys.exit("The function u_0 might not be a suitable choice. The function u_0 must be continuous and have exactly two zeros in [x_a,x_b]")
+    # h1 = optimize.root(u_0_func,zbd[0])
+    # h2 = optimize.root(u_0_func, zbd[1])
+
+    # b1 = [h1]
+    # b2 = [h2]
+
+    x = np.linspace(x_a, x_b, n_x_points)
+    t = np.arange(0, t_final, dt)
+    u_0 = np.reshape(u_0_func(x), (100, 1))
+    data = [u_0]
+
+    u = u_0
+    for t_i in range(n_t_points):
+        u = solve_one_time_step(u_0=u, mu=mu)
+
+        # Find next point of functions h1 and h2
+
+        data.append(u)
+
+        if (t_i % 1000) == 0:
+            print(".", end="")
+
+    result = np.hstack(data)
 
 
 solve_heat_equation(u_0_func=initial_value,
