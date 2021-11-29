@@ -5,7 +5,7 @@ from math import ceil
 import numpy as np
 
 
-def solve_one_time_step(u_0, mu):
+def solve_one_time_step(u_0, mu, temp_a=0, temp_b=0):
     def create_main_matrix(n_x_points, mu):
         """
         Matrix for theta method
@@ -19,9 +19,13 @@ def solve_one_time_step(u_0, mu):
 
     u = u_0
 
+    bv = np.zeros_like(u_0)
+    bv[0] = mu*temp_a
+    bv[-1] = mu*temp_b
+
     D2, I = create_main_matrix(n_x_points=u_0.shape[0], mu=mu)
     lhs = (I - D2 / 2)
-    rhs = (I + D2 / 2) * u
+    rhs = (I + D2 / 2) * u + bv
     u = np.transpose(np.mat(sparse.linalg.spsolve(lhs, rhs)))
 
     return u
@@ -53,7 +57,7 @@ def solve_heat_equation(u_0_func, t_final, x_a, x_b, temp_a, temp_b, n_x_points,
 
     u = u_0
     for t_i in range(n_t_points):
-        u = solve_one_time_step(u_0=u, mu=mu)
+        u = solve_one_time_step(u_0=u, mu=mu, temp_a=temp_a-1+np.cos(t_i*dt), temp_b=temp_b-1+np.cos(t_i*dt))
         data.append(u)
 
         if (t_i % 1000) == 0:
@@ -76,7 +80,7 @@ def solve_heat_equation(u_0_func, t_final, x_a, x_b, temp_a, temp_b, n_x_points,
 
 
 def initial_value(x):
-    return -6 * np.sin(np.pi * x)
+    return -6 * np.sin(np.pi * x) + 2*x
 
 
 def moving_boundary(t):
@@ -85,11 +89,11 @@ def moving_boundary(t):
 
 
 solve_heat_equation(u_0_func=initial_value,
-                    t_final=0.1,
-                    x_a=0,
-                    x_b=1,
-                    temp_a=0,
-                    temp_b=0,
+                    t_final=20,
+                    x_a=-1,
+                    x_b=2,
+                    temp_a=-2,
+                    temp_b=4,
                     n_x_points=100,
-                    c=1,
+                    c=0.01,
                     plot=True)
